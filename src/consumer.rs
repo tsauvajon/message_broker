@@ -24,20 +24,23 @@ pub async fn consume_one(stream: &mut TcpStream) -> Result<Option<bytes::Bytes>,
             Ok(0) => return Ok(None), // EOF
             Ok(n) => {
                 if &buf[n - 1..n] == b"\0" {
-                    value.append(&mut buf[1..n - 1].to_vec());
-
-                    if buf[0] == b"+"[0] {
-                        return Ok(Some(value.into()));
-                    } else if buf[0] == b"-"[0] {
-                        return Ok(None);
-                    } else {
-                        return Err(ConsumeError::ProtocolError);
-                    }
+                    value.append(&mut buf[..n - 1].to_vec());
+                    break;
                 }
 
                 value.append(&mut buf[..n].to_vec());
             }
             Err(err) => return Err(ConsumeError::IoError(err)),
         };
+    }
+
+    let operand = &value[0];
+    if *operand == b"+"[0] {
+        value = value[1..].to_vec();
+        Ok(Some(value.into()))
+    } else if *operand == b"-"[0] {
+        Ok(None)
+    } else {
+        Err(ConsumeError::ProtocolError)
     }
 }
